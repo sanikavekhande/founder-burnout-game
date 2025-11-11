@@ -1,14 +1,14 @@
 export const PHASE_TITLES = [
-  'Stage 1: Garage Sparks',
-  'Stage 2: Beta Or Bust',
-  'Stage 3: Demo Day Scramble',
-  'Stage 4: Investor Reckoning',
-  'Stage 5: Viral Mirage',
-  'Stage 6: Compliance Curveball',
-  'Stage 7: Hiring Freeze',
-  'Stage 8: Board Ultimatum',
-  'Stage 9: Burnout Line',
-  'Stage 10: Final Ledger'
+  'Month 1: Garage Sparks',
+  'Month 2: Beta Or Bust',
+  'Month 3: Demo Day Scramble',
+  'Month 4: Investor Reckoning',
+  'Month 5: Viral Mirage',
+  'Month 6: Compliance Curveball',
+  'Month 7: Hiring Freeze',
+  'Month 8: Board Ultimatum',
+  'Month 9: Burnout Line',
+  'Month 10: Final Ledger'
 ];
 export const TOTAL_PHASES = PHASE_TITLES.length;
 
@@ -99,6 +99,25 @@ export function computeDeltas(nlp, updateText, gameState) {
   if (traits.includes('Charisma') && intent === 'funding') {
     deltas.funding += 4;
   }
+
+  const severity = Math.max(
+    Math.abs(sentiment - 50),
+    Math.abs(feasibility - 50),
+    Math.abs(buzzword - 50) * 0.8
+  );
+  let multiplier = 1;
+  if (severity >= 35) {
+    multiplier = 2;
+  } else if (severity >= 25) {
+    multiplier = 1.5;
+  } else if (severity < 10) {
+    multiplier = 0.8;
+  }
+  DEFAULT_METERS.forEach(key => {
+    if (typeof deltas[key] === 'number') {
+      deltas[key] *= multiplier;
+    }
+  });
 
   DEFAULT_METERS.forEach(key => {
     deltas[key] = Number(deltas[key] || 0);

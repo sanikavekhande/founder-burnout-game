@@ -56,16 +56,16 @@ let previousMeters = { ...gameState.meters };
 let reactionOverlay = null;
 let audioCtx = null;
 const PHASE_TITLES = [
-  'Stage 1: Garage Sparks',
-  'Stage 2: Beta Or Bust',
-  'Stage 3: Demo Day Scramble',
-  'Stage 4: Investor Reckoning',
-  'Stage 5: Viral Mirage',
-  'Stage 6: Compliance Curveball',
-  'Stage 7: Hiring Freeze',
-  'Stage 8: Board Ultimatum',
-  'Stage 9: Burnout Line',
-  'Stage 10: Final Ledger'
+  { title: 'Month 1: Garage Sparks', subtitle: 'You promised friends-and-family traction before brunch.' },
+  { title: 'Month 2: Beta Or Bust', subtitle: 'Half the users are bots and the other half your roommates.' },
+  { title: 'Month 3: Demo Day Scramble', subtitle: 'Slides are pristine, product is duct tape, investors arrive at dawn.' },
+  { title: 'Month 4: Investor Reckoning', subtitle: 'Partners want real metrics, not vibes. Uh oh.' },
+  { title: 'Month 5: Viral Mirage', subtitle: 'Mentions spike, servers melt, revenue sleeps.' },
+  { title: 'Month 6: Compliance Curveball', subtitle: 'Regulators finally read your privacy policy and sent a novel.' },
+  { title: 'Month 7: Hiring Freeze', subtitle: 'Team wants perks; you offer gratitude and ramen.' },
+  { title: 'Month 8: Board Ultimatum', subtitle: 'The board suggests you “grow faster” or “consider options”.' },
+  { title: 'Month 9: Burnout Line', subtitle: 'Nobody remembers weekends, everyone remembers caffeine.' },
+  { title: 'Month 10: Final Ledger', subtitle: 'One last sprint before the term sheet or the therapist.' }
 ];
 const TOTAL_PHASES = PHASE_TITLES.length;
 const API_BASE_URL = 'http://localhost:3000';
@@ -81,6 +81,7 @@ const TRAIT_CLASS_MAP = {
   Charisma: 'charisma',
   Resilience: 'resilience'
 };
+const WIN_ENDINGS = new Set(['Steady Runway', 'Conscious Company', 'Stable Mediocrity']);
 
 function resetProfileCard() {
   const founderEl = document.getElementById('profileFounder');
@@ -104,7 +105,9 @@ function updateProfileMeta() {
   if (companyEl) {
     const industry = gameState.company.industry || '—';
     const tech = gameState.company.tech || '—';
-    companyEl.textContent = `${industry} • ${tech}`;
+    const companyName = gameState.company.name || '';
+    const stack = `${industry} • ${tech}`;
+    companyEl.textContent = companyName ? `${companyName} • ${stack}` : stack;
   }
   const traitsEl = document.getElementById('profileTraits');
   if (traitsEl) {
@@ -152,7 +155,7 @@ document.getElementById('startGame').addEventListener('click', () => {
   const traits = Array.from(traitBoxes).map(cb => cb.value);
   
   if (traits.length !== 2) {
-    alert('Please select exactly 2 traits!');
+    alert('Pick exactly two founder superpowers.');
     return;
   }
   
@@ -163,12 +166,11 @@ document.getElementById('startGame').addEventListener('click', () => {
   updateProfileMeta();
   updateProfileMeters();
   
-  const label = founder ? `${name} • Founder ${founder}` : name;
-  document.getElementById('companyDisplay').textContent = label;
   const companyMetaEl = document.getElementById('companyMeta');
   if (companyMetaEl) {
     companyMetaEl.textContent = `${industry} • ${tech}`;
   }
+  setHeadlineLoadingVisible(true);
   
   showScreen('game');
   loadInitialScene();
@@ -196,10 +198,6 @@ const companyMetaEl = document.getElementById('companyMeta');
 if (companyMetaEl) {
   companyMetaEl.textContent = '';
 }
-const companyDisplayEl = document.getElementById('companyDisplay');
-if (companyDisplayEl && !companyDisplayEl.textContent) {
-  companyDisplayEl.textContent = '—';
-}
 
 updateTextArea.addEventListener('input', () => {
   charCountSpan.textContent = updateTextArea.value.length;
@@ -216,8 +214,18 @@ if (roundTotalEl) {
   roundTotalEl.textContent = TOTAL_PHASES;
 }
 const phaseTitleEl = document.getElementById('phaseTitle');
+const phaseSubtitleEl = document.getElementById('phaseSubtitle');
+function setHeadlineLoadingVisible(visible) {
+  const headlineLoadingEl = document.getElementById('headlineLoadingNote');
+  if (headlineLoadingEl) {
+    headlineLoadingEl.style.display = visible ? 'block' : 'none';
+  }
+}
 if (phaseTitleEl) {
-  phaseTitleEl.textContent = PHASE_TITLES[0];
+  phaseTitleEl.textContent = PHASE_TITLES[0].title;
+}
+if (phaseSubtitleEl) {
+  phaseSubtitleEl.textContent = PHASE_TITLES[0].subtitle;
 }
 
 document.getElementById('submitRound').addEventListener('click', async () => {
@@ -265,11 +273,12 @@ document.getElementById('submitRound').addEventListener('click', async () => {
     updateRoundSummary(result);
     updateNPCs(result.npcLines);
     updatePhaseTitle(result.phaseTitle);
-    updateRoundDisplay(result.newState.round);
+  updateRoundDisplay(result.newState.round);
+  updatePhaseTitle(PHASE_TITLES[Math.min(result.newState.round - 1, PHASE_TITLES.length - 1)]);
     const reactionMessage = (result.sceneCard && (result.sceneCard.hook || result.sceneCard.narrative))
       || result.intentSummary
       || (result.insights && result.insights.tip)
-      || 'Week resolved.';
+      || 'Chaos temporarily delayed.';
     const reactionType = determineReactionType(result.deltas);
     showReaction(reactionMessage, reactionType);
     
@@ -284,7 +293,7 @@ document.getElementById('submitRound').addEventListener('click', async () => {
     
   } catch (error) {
     console.error('Error processing round:', error);
-    alert('Failed to process round. Check console and try again.');
+    alert('Server had a small meltdown. Check the console and try again.');
   } finally {
     submitBtn.disabled = false;
     loadingMsg.classList.remove('active');
@@ -573,8 +582,17 @@ function displayStory(sceneCard, intentSummary, milestoneEvents) {
   const storyEl = document.getElementById('story');
   if (!storyEl) return;
   const base = (sceneCard && (sceneCard.narrative || sceneCard.description)) || intentSummary || '';
+  const trimmed = base
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/[\.\!?]/)
+    .filter(Boolean)
+    .slice(0, 1)
+    .map(line => line.trim())
+    .join('. ')
+    .slice(0, 160);
   const milestoneLine = milestoneEvents && milestoneEvents.length ? ` ${milestoneEvents[0].summary || ''}` : '';
-  const text = (base + milestoneLine).trim();
+  const text = `${trimmed}${milestoneLine}`.trim();
   storyEl.textContent = text;
   storyEl.classList.remove('visible');
   void storyEl.offsetWidth;
@@ -584,11 +602,12 @@ function displayStory(sceneCard, intentSummary, milestoneEvents) {
 }
 
 function resetRoundSummary() {
+  setHeadlineLoadingVisible(true);
   const headlineEl = document.getElementById('summaryHeadline');
   const ctaEl = document.getElementById('summaryCTA');
   const highlightEl = document.getElementById('summaryHighlight');
-  if (headlineEl) headlineEl.textContent = 'Submit your first update to see how the world reacts.';
-  if (ctaEl) ctaEl.textContent = 'Keep burnout low without tanking funding or ethics.';
+  if (headlineEl) headlineEl.textContent = 'Feed the valley a story so they can panic properly.';
+  if (ctaEl) ctaEl.textContent = 'Keep hype and humans balanced before the board drafts a coup.';
   if (highlightEl) {
     highlightEl.textContent = '';
     highlightEl.style.display = 'none';
@@ -601,6 +620,7 @@ function resetRoundSummary() {
 }
 
 function updateRoundSummary(result) {
+  setHeadlineLoadingVisible(false);
   const headlineEl = document.getElementById('summaryHeadline');
   const ctaEl = document.getElementById('summaryCTA');
   const highlightEl = document.getElementById('summaryHighlight');
@@ -609,8 +629,8 @@ function updateRoundSummary(result) {
   const milestoneEvent = Array.isArray(result.milestoneEvents) && result.milestoneEvents.length
     ? result.milestoneEvents[0]
     : null;
-  const insightHeadline = result.insights?.headline || 'Mixed signals from the front lines.';
-  const insightCTA = result.insights?.tip || 'Keep iterating toward balance before the board panics.';
+  const insightHeadline = result.insights?.headline || 'Markets are doomscrolling till you talk.';
+  const insightCTA = result.insights?.tip || 'Ship specifics before the investors send “quick follow-up?”';
   headlineEl.textContent = scene.title || milestoneEvent?.title || insightHeadline;
   ctaEl.textContent = scene.narrative || scene.body || milestoneEvent?.summary || insightCTA;
   const deltas = result.deltas || {};
@@ -650,19 +670,67 @@ function updateNPCs(npcLines) {
   document.getElementById('emp-line').textContent = `"${npcLines.employee}"`;
 }
 
-function updatePhaseTitle(title) {
-  document.getElementById('phaseTitle').textContent = title;
+function updatePhaseTitle(stage) {
+  const titleEl = document.getElementById('phaseTitle');
+  const subtitleEl = document.getElementById('phaseSubtitle');
+  if (titleEl) {
+    titleEl.textContent = typeof stage === 'string' ? stage : stage?.title;
+  }
+  if (subtitleEl) {
+    subtitleEl.textContent = typeof stage === 'object' ? stage.subtitle : '';
+  }
 }
 
 function updateRoundDisplay(round) {
   const displayRound = Math.min(round, TOTAL_PHASES);
-  document.getElementById('roundDisplay').textContent = displayRound;
+  const roundEl = document.getElementById('roundDisplay');
+  if (roundEl) {
+    roundEl.textContent = displayRound;
+  }
   updateProgress(displayRound);
 }
 
 function showEnding(ending, finalMeters, postMortem) {
+  const container = document.querySelector('.ending-container');
+  const badgeEl = document.getElementById('endingBadge');
+  const summaryEl = document.getElementById('endingSummary');
+  const finalStats = document.getElementById('finalStats');
+  const profileEl = document.getElementById('endingProfile');
+  const isWin = WIN_ENDINGS.has(ending.title);
+  if (container) {
+    container.classList.toggle('win', isWin);
+    container.classList.toggle('loss', !isWin);
+  }
+  if (badgeEl) {
+    badgeEl.textContent = isWin ? 'Runway Reset' : 'Spicy Collapse';
+  }
   document.getElementById('endingTitle').textContent = ending.title;
-  document.getElementById('endingText').textContent = ending.text;
+  if (summaryEl) {
+    summaryEl.textContent =
+      formatPunchySummary(ending.text) ||
+      (isWin
+        ? 'You kept the cap table calm long enough to cash the wire.'
+        : 'Investors lit the group chat while your coffee went cold.');
+  }
+  if (finalStats) {
+    finalStats.innerHTML = ['ethics', 'burnout', 'funding']
+      .map(key => renderEndingMeter(key, finalMeters[key]))
+      .join('');
+  }
+  if (profileEl) {
+    const { name, founder, industry, tech } = gameState.company;
+    const traitMarkup = gameState.traits.length
+      ? gameState.traits
+          .map(trait => `<span class="trait-pill ${TRAIT_CLASS_MAP[trait] || 'muted'}">${trait}</span>`)
+          .join('')
+      : '<span class="trait-pill muted">Traits pending</span>';
+    profileEl.innerHTML = `
+      <h3>Founder dossier</h3>
+      <p>${founder || 'Anonymous human'} @ ${name || 'Unnamed Co.'}</p>
+      <p>${industry} • ${tech}</p>
+      <div class="ending-traits">${traitMarkup}</div>
+    `;
+  }
   const postEl = document.getElementById('endingPostMortem');
   if (postEl) {
     if (postMortem) {
@@ -673,14 +741,6 @@ function showEnding(ending, finalMeters, postMortem) {
       postEl.style.display = 'none';
     }
   }
-  
-  const finalStats = document.getElementById('finalStats');
-  finalStats.innerHTML = `
-    <div><strong>${Math.round(finalMeters.ethics)}</strong><span>Ethics</span></div>
-    <div><strong>${Math.round(finalMeters.burnout)}</strong><span>Burnout</span></div>
-    <div><strong>${Math.round(finalMeters.funding)}</strong><span>Funding</span></div>
-  `;
-  
   showScreen('ending');
 }
 
@@ -707,17 +767,37 @@ document.getElementById('restart').addEventListener('click', () => {
   }
   updateAdvisorInsights(null, null);
   resetRoundSummary();
-  document.getElementById('companyDisplay').textContent = '—';
   const companyMetaEl = document.getElementById('companyMeta');
   if (companyMetaEl) {
     companyMetaEl.textContent = '';
   }
   resetProfileCard();
-  document.getElementById('vc-line').textContent = '"Waiting for your first update..."';
-  document.getElementById('emp-line').textContent = '"Let\'s ship something."';
+  document.getElementById('vc-line').textContent = 'Still waiting for proof you can math, founder.';
+  document.getElementById('emp-line').textContent = 'Ping me when weekends are legal again.';
   
   showScreen('setup');
 });
+
+function renderEndingMeter(key, value) {
+  const labelMap = { ethics: 'Ethics', burnout: 'Burnout', funding: 'Funding' };
+  const classes = { ethics: 'ethics', burnout: 'burnout', funding: 'funding' };
+  const safeValue = clampValue(Number(value) || 0, 0, 100);
+  return `
+    <div class="ending-meter">
+      <label>${labelMap[key] || key}</label>
+      <div class="ending-meter-bar">
+        <span class="ending-meter-fill ${classes[key] || ''}" style="width:${safeValue}%"></span>
+      </div>
+      <strong>${Math.round(safeValue)}</strong>
+    </div>
+  `;
+}
+
+function formatPunchySummary(text = '') {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  const match = cleaned.match(/[^.?!]+[.?!]?/);
+  return match ? match[0].trim() : cleaned;
+}
 
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
