@@ -1,0 +1,186 @@
+const PHASE_TITLES = [
+  "Week 1: Gloomy Monday", "Week 2: Scrappy Tuesday", "Week 3: Pivot Wednesday",
+  "Week 4: Hump Day Hustle", "Week 5: Throwback Thursday", "Week 6: Feature Friday",
+  "Week 7: Sprint Saturday", "Week 8: Sunday Scaries", "Week 9: Momentum Monday",
+  "Week 10: Tech Debt Tuesday", "Week 11: Wireframe Wednesday", "Week 12: Demo Thursday",
+  "Week 13: Fundraise Friday", "Week 14: Burnout Saturday", "Week 15: Recovery Sunday",
+  "Week 16: Metrics Monday", "Week 17: Press Tuesday", "Week 18: Hiring Wednesday",
+  "Week 19: Scale Thursday", "Week 20: Crunch Friday", "Week 21: All-Hands Saturday",
+  "Week 22: Reflect Sunday", "Week 23: Final Push Monday", "Week 24: Last Mile Tuesday",
+  "Week 25: Demo Day Eve", "Week 26: Judgment Day"
+];
+
+const DEFAULT_METERS = ['burnout', 'funding', 'ethics'];
+
+export function getPhaseTitle(round) {
+  return PHASE_TITLES[Math.min(round - 1, PHASE_TITLES.length - 1)];
+}
+
+function clampValue(value, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function inferIntent(updateText = '', nlp = {}) {
+  if (nlp.intent) return nlp.intent;
+  const lower = updateText.toLowerCase();
+  if (/(fundraise|investor|vc|angel|pitch|term sheet|runway)/.test(lower)) return 'funding';
+  if (/(burnout|rest|mental|therapy|sleep|offsite|retreat|hiring|hire)/.test(lower)) return 'rest';
+  if (/(ethic|governance|compliance|privacy|regulator|safety|trust)/.test(lower)) return 'ethics';
+  if (/(outage|crash|fire|leak|lawsuit|crisis)/.test(lower)) return 'crisis';
+  if (/(ship|launch|feature|deployment|build|sprint)/.test(lower)) return 'build';
+  return 'default';
+}
+
+export function computeDeltas(nlp, updateText, gameState) {
+  const { traits, company } = gameState;
+  const { sentiment = 50, buzzword = 50, feasibility = 55 } = nlp;
+  const intent = inferIntent(updateText, nlp);
+  const deltas = { burnout: 0, funding: 0, ethics: 0 };
+
+  if (nlp?.meterDeltas) {
+    DEFAULT_METERS.forEach(key => {
+      if (typeof nlp.meterDeltas[key] === 'number') {
+        deltas[key] += nlp.meterDeltas[key];
+      }
+    });
+  } else {
+    switch (intent) {
+      case 'funding':
+        deltas.funding += 11;
+        deltas.burnout += 6;
+        deltas.ethics -= 3;
+        break;
+      case 'rest':
+        deltas.burnout -= 12;
+        deltas.ethics += 4;
+        deltas.funding -= 4;
+        break;
+      case 'ethics':
+        deltas.ethics += 9;
+        deltas.funding -= 2;
+        break;
+      case 'crisis':
+        deltas.burnout += 14;
+        deltas.ethics -= 6;
+        break;
+      case 'build':
+        deltas.burnout += 7;
+        deltas.funding += 3;
+        break;
+      default:
+        break;
+    }
+  }
+
+  deltas.ethics -= (buzzword - 50) * 0.05;
+  deltas.funding += (feasibility - 50) * 0.09;
+  deltas.burnout += (65 - sentiment) * 0.05;
+  if (/\btransparen|audit|report\b/i.test(updateText)) deltas.ethics += 5;
+  if (/\bhire|hiring|team\b/i.test(updateText)) deltas.burnout -= 5;
+
+  const industryMods = getIndustryModifiers(company.industry);
+  const techMods = getTechModifiers(company.tech);
+  if (deltas.ethics < 0) deltas.ethics *= industryMods.ethics_risk * techMods.ethics_risk;
+  if (deltas.funding > 0) deltas.funding *= industryMods.funding * techMods.funding;
+  deltas.burnout *= industryMods.burnout * techMods.burnout;
+
+  if (traits.includes('Integrity') && deltas.ethics < 0) {
+    deltas.ethics *= 0.6;
+  }
+  if (traits.includes('Resilience')) {
+    deltas.burnout -= 4;
+  }
+  if (traits.includes('Ambition')) {
+    deltas.burnout += 2;
+    deltas.funding += 1;
+  }
+  if (traits.includes('Charisma') && intent === 'funding') {
+    deltas.funding += 4;
+  }
+
+  DEFAULT_METERS.forEach(key => {
+    deltas[key] = Number(deltas[key] || 0);
+  });
+  return deltas;
+}
+
+export function applyDeltas(deltas, gameState) {
+  const newMeters = { ...gameState.meters };
+  DEFAULT_METERS.forEach(key => {
+    const current = typeof newMeters[key] === 'number' ? newMeters[key] : 50;
+    const delta = typeof deltas[key] === 'number' ? deltas[key] : 0;
+    newMeters[key] = clampValue(current + delta);
+  });
+  return newMeters;
+}
+
+export function checkEnding(meters, round) {
+  const { ethics, burnout, funding } = meters;
+  if (burnout > 85) {
+    return {
+      title: 'Collapse',
+      text: 'You burnt out. Your co-founder took over while you checked into a wellness retreat in Bali. The company pivoted to selling NFTs.'
+    };
+  }
+  if (funding < 5) {
+    return {
+      title: 'Bankruptcy',
+      text: 'You ran out of runway. Your last Slack message was "brb" three months ago. The domain expired.'
+    };
+  }
+  if (ethics < 15) {
+    return {
+      title: 'Scandal',
+      text: 'Regulators and Reddit teamed up. Your apology thread has 4k comments and zero mercy.'
+    };
+  }
+  if (round < 26) return null;
+
+  if (funding > 80 && ethics > 55 && burnout < 40) {
+    return {
+      title: 'Steady Runway',
+      text: 'You dialed in a humane, well-funded machine. LPs brag about backing you early.'
+    };
+  }
+  if (funding > 85 && ethics < 35) {
+    return {
+      title: 'Shady Exit',
+      text: 'A mega-corp acquired you before the lawsuits landed. Your yacht is named "Materially False."'
+    };
+  }
+  if (ethics > 80 && burnout < 35 && funding > 45) {
+    return {
+      title: 'Conscious Company',
+      text: 'You built a business people respect and actually want to work at. Wild concept.'
+    };
+  }
+  if (burnout > 65 && funding > 70) {
+    return {
+      title: 'Zombie Unicorn',
+      text: 'Money kept arriving but everyone is dead behind the eyes. Enjoy the golden handcuffs.'
+    };
+  }
+  return {
+    title: 'Stable Mediocrity',
+    text: 'You built a sustainable business. 20 employees, $3M ARR, no headlines. Your parents still ask when you\'ll get a "real job."'
+  };
+}
+
+function getIndustryModifiers(industry) {
+  const mods = {
+    'Healthcare': { ethics_risk: 0.7, funding: 0.9, burnout: 0.9 },
+    'Software': { ethics_risk: 1.0, funding: 1.0, burnout: 1.0 },
+    'Finance': { ethics_risk: 1.2, funding: 1.15, burnout: 1.05 },
+    'Electronics': { ethics_risk: 1.0, funding: 1.0, burnout: 1.1 }
+  };
+  return mods[industry] || mods['Software'];
+}
+
+function getTechModifiers(tech) {
+  const mods = {
+    'Software': { ethics_risk: 1.0, funding: 1.0, burnout: 1.0 },
+    'AI/Automation': { ethics_risk: 1.25, funding: 1.05, burnout: 1.1 },
+    'Physical Product': { ethics_risk: 0.95, funding: 0.9, burnout: 1.05 }
+  };
+  return mods[tech] || mods['Software'];
+}
