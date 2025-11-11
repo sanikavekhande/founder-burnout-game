@@ -1,14 +1,16 @@
-const PHASE_TITLES = [
-  "Week 1: Gloomy Monday", "Week 2: Scrappy Tuesday", "Week 3: Pivot Wednesday",
-  "Week 4: Hump Day Hustle", "Week 5: Throwback Thursday", "Week 6: Feature Friday",
-  "Week 7: Sprint Saturday", "Week 8: Sunday Scaries", "Week 9: Momentum Monday",
-  "Week 10: Tech Debt Tuesday", "Week 11: Wireframe Wednesday", "Week 12: Demo Thursday",
-  "Week 13: Fundraise Friday", "Week 14: Burnout Saturday", "Week 15: Recovery Sunday",
-  "Week 16: Metrics Monday", "Week 17: Press Tuesday", "Week 18: Hiring Wednesday",
-  "Week 19: Scale Thursday", "Week 20: Crunch Friday", "Week 21: All-Hands Saturday",
-  "Week 22: Reflect Sunday", "Week 23: Final Push Monday", "Week 24: Last Mile Tuesday",
-  "Week 25: Demo Day Eve", "Week 26: Judgment Day"
+export const PHASE_TITLES = [
+  'Stage 1: Garage Sparks',
+  'Stage 2: Beta Or Bust',
+  'Stage 3: Demo Day Scramble',
+  'Stage 4: Investor Reckoning',
+  'Stage 5: Viral Mirage',
+  'Stage 6: Compliance Curveball',
+  'Stage 7: Hiring Freeze',
+  'Stage 8: Board Ultimatum',
+  'Stage 9: Burnout Line',
+  'Stage 10: Final Ledger'
 ];
+export const TOTAL_PHASES = PHASE_TITLES.length;
 
 const DEFAULT_METERS = ['burnout', 'funding', 'ethics'];
 
@@ -134,7 +136,7 @@ export function checkEnding(meters, round) {
       text: 'Regulators and Reddit teamed up. Your apology thread has 4k comments and zero mercy.'
     };
   }
-  if (round < 26) return null;
+  if (round < TOTAL_PHASES) return null;
 
   if (funding > 80 && ethics > 55 && burnout < 40) {
     return {
@@ -168,19 +170,23 @@ export function checkEnding(meters, round) {
 
 function getIndustryModifiers(industry) {
   const mods = {
-    'Healthcare': { ethics_risk: 0.7, funding: 0.9, burnout: 0.9 },
-    'Software': { ethics_risk: 1.0, funding: 1.0, burnout: 1.0 },
-    'Finance': { ethics_risk: 1.2, funding: 1.15, burnout: 1.05 },
-    'Electronics': { ethics_risk: 1.0, funding: 1.0, burnout: 1.1 }
+    'AI SaaS': { ethics_risk: 1.2, funding: 1.1, burnout: 1.05 },
+    'Climate Tech': { ethics_risk: 0.85, funding: 0.95, burnout: 1.1 },
+    'Fintech Infrastructure': { ethics_risk: 1.15, funding: 1.2, burnout: 1.05 },
+    'Health Tech': { ethics_risk: 0.75, funding: 0.9, burnout: 0.95 },
+    'Consumer Social': { ethics_risk: 1.0, funding: 1.05, burnout: 1.15 },
+    'Robotics & Defense': { ethics_risk: 0.95, funding: 1.0, burnout: 1.1 }
   };
-  return mods[industry] || mods['Software'];
+  return mods[industry] || mods['AI SaaS'];
 }
 
 function getTechModifiers(tech) {
   const mods = {
-    'Software': { ethics_risk: 1.0, funding: 1.0, burnout: 1.0 },
-    'AI/Automation': { ethics_risk: 1.25, funding: 1.05, burnout: 1.1 },
-    'Physical Product': { ethics_risk: 0.95, funding: 0.9, burnout: 1.05 }
+    'Cloud Platform': { ethics_risk: 1.0, funding: 1.0, burnout: 1.0 },
+    'AI Agents': { ethics_risk: 1.25, funding: 1.08, burnout: 1.1 },
+    'Robotics Hardware': { ethics_risk: 0.95, funding: 0.92, burnout: 1.12 },
+    'Bio/Med': { ethics_risk: 0.8, funding: 0.9, burnout: 0.98 },
+    'Marketplace Network': { ethics_risk: 1.05, funding: 1.05, burnout: 1.08 }
   };
-  return mods[tech] || mods['Software'];
+  return mods[tech] || mods['Cloud Platform'];
 }

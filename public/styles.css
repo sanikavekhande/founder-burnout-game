@@ -41,16 +41,17 @@ body {
   border: 1px solid #333;
 }
 
-.setup-container h1 {
-  font-size: 2.5rem;
-  margin-bottom: 10px;
-  -webkit-text-fill-color: transparent;
+.hero-title {
+  font-size: 2.75rem;
+  margin-bottom: 8px;
+  color: #f5f7ff;
 }
 
-.subtitle {
-  color: #999;
-  margin-bottom: 30px;
-  font-size: 0.95rem;
+.goal-text {
+  margin-bottom: 28px;
+  font-size: 1rem;
+  color: #a0a6c8;
+  line-height: 1.4;
 }
 
 .setup-tabs {
@@ -153,30 +154,80 @@ body {
   border-color: #667eea;
 }
 
-#traits {
+.trait-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
 }
 
-.trait {
+.trait-card {
   display: flex;
   align-items: center;
-  padding: 12px;
+  gap: 12px;
+  padding: 12px 14px;
   background: #0a0a0a;
   border: 1px solid #333;
-  border-radius: 6px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.trait:hover {
-  border-color: #667eea;
+.trait-card input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #667eea;
 }
 
-.trait input[type="checkbox"] {
-  margin-right: 8px;
-  cursor: pointer;
+.trait-icon {
+  font-size: 1.2rem;
+}
+
+.trait-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trait-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #f5f5ff;
+}
+
+.trait-desc {
+  font-size: 0.75rem;
+  color: #9aa0b6;
+  letter-spacing: 0.2px;
+}
+
+.trait-card.trait-ambition {
+  border-color: rgba(249, 115, 22, 0.5);
+  background: rgba(249, 115, 22, 0.08);
+}
+.trait-card.trait-ambition input { accent-color: #f97316; }
+
+.trait-card.trait-integrity {
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.08);
+}
+.trait-card.trait-integrity input { accent-color: #22d3ee; }
+
+.trait-card.trait-charisma {
+  border-color: rgba(192, 132, 252, 0.5);
+  background: rgba(192, 132, 252, 0.08);
+}
+.trait-card.trait-charisma input { accent-color: #c084fc; }
+
+.trait-card.trait-resilience {
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.08);
+}
+.trait-card.trait-resilience input { accent-color: #4ade80; }
+
+.trait-card:hover {
+  border-color: #ffffff;
 }
 
 .btn-primary {
@@ -251,6 +302,115 @@ body {
   height: 100%;
   background: linear-gradient(90deg, #22c55e, #4ade80);
   transition: width 0.5s ease;
+}
+
+.interaction-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+#founderProfile.profile-card {
+  margin-top: 20px;
+}
+
+.profile-card .profile-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f5f7ff;
+}
+
+.profile-card .profile-company {
+  color: #a5acff;
+  font-size: 0.85rem;
+  margin: 4px 0 12px;
+}
+
+.profile-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.trait-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #f5f5ff;
+}
+
+.trait-pill.muted {
+  color: #9aa0b6;
+  border-color: rgba(255,255,255,0.12);
+}
+
+.trait-pill.ambition { border-color: #f97316; color: #f97316; }
+.trait-pill.integrity { border-color: #22d3ee; color: #22d3ee; }
+.trait-pill.charisma { border-color: #c084fc; color: #c084fc; }
+.trait-pill.resilience { border-color: #4ade80; color: #4ade80; }
+
+.profile-section {
+  margin-bottom: 16px;
+}
+
+.profile-section-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  color: #9aa0b6;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.mini-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mini-label {
+  width: 70px;
+  font-size: 0.8rem;
+  color: #cdd0ff;
+}
+
+.mini-bar {
+  flex: 1;
+  height: 6px;
+  background: #141414;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #242424;
+}
+
+.mini-fill {
+  height: 100%;
+  width: 50%;
+  transition: width 0.4s ease;
+}
+
+.mini-fill.ethics {
+  background: linear-gradient(90deg, #60a5fa, #3b82f6);
+}
+
+.mini-fill.funding {
+  background: linear-gradient(90deg, #a855f7, #7c3aed);
+}
+
+.mini-fill.burnout {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.mini-value {
+  width: 34px;
+  text-align: right;
+  font-size: 0.85rem;
+  color: #f5f5ff;
 }
 
 #updateText {
@@ -514,6 +674,14 @@ body {
   font-size: 0.85rem;
 }
 
+.panel-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #aab3ff;
+  margin-bottom: 12px;
+}
+
 .analysis-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -746,7 +914,7 @@ body {
     grid-template-columns: repeat(3, 1fr);
   }
   
-  #traits {
+  .trait-grid {
     grid-template-columns: 1fr;
   }
   

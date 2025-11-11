@@ -9,7 +9,8 @@ import {
   generateSceneCard,
   generateMilestoneNarratives,
   generatePostMortem,
-  getDefaultNarrative
+  getDefaultNarrative,
+  generateIntroScene
 } from './geminiService.js';
 import { computeDeltas, applyDeltas, checkEnding, getPhaseTitle } from './gameLogic.js';
 
@@ -93,13 +94,14 @@ app.post('/api/process-round', async (req, res) => {
     const insights = await generateInsights(stateForNarrative, deltas, nlp, text, apiKey);
     
     const historyForPost = Array.isArray(gameState.history) ? [...gameState.history] : [];
-    historyForPost.push({ text, intent: nlp.intent, deltas, nlp, meters: newMeters });
+    historyForPost.push({ round: newRound, text, intent: nlp.intent, deltas, nlp, meters: newMeters });
     const postMortem = ending
       ? await generatePostMortem(
           historyForPost,
           { meters: newMeters, narrative: updatedNarrative },
           ending,
-          apiKey
+          apiKey,
+          stateForNarrative
         )
       : null;
     
@@ -131,11 +133,29 @@ app.post('/api/process-round', async (req, res) => {
   }
 });
 
+app.post('/api/intro-scene', async (req, res) => {
+  try {
+    const { gameState, apiKey } = req.body;
+    if (!gameState) {
+      return res.status(400).json({ error: 'Game state required' });
+    }
+    const hydratedState = {
+      ...gameState,
+      narrative: gameState.narrative || getDefaultNarrative()
+    };
+    const intro = await generateIntroScene(hydratedState, apiKey);
+    res.json(intro);
+  } catch (error) {
+    console.error('Error generating intro scene:', error);
+    res.status(500).json({ error: 'Intro scene failed', details: error.message });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📊 Game ready at http://localhost:${PORT}`);
