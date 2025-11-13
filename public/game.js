@@ -82,6 +82,8 @@ const TRAIT_CLASS_MAP = {
   Resilience: 'resilience'
 };
 const WIN_ENDINGS = new Set(['Steady Runway', 'Conscious Company', 'Stable Mediocrity']);
+const DEFAULT_VC_LINE = 'Still waiting for proof you can math, founder.';
+const DEFAULT_EMP_LINE = 'Ping me when weekends are legal again.';
 
 function resetProfileCard() {
   const founderEl = document.getElementById('profileFounder');
@@ -143,6 +145,8 @@ function setMiniMeter(fillId, valueId, value) {
 }
 
 resetProfileCard();
+updateTraitFit();
+updateNPCs();
 
 // Setup screen logic
 document.getElementById('startGame').addEventListener('click', () => {
@@ -165,15 +169,9 @@ document.getElementById('startGame').addEventListener('click', () => {
   updatePhaseTitle(PHASE_TITLES[0]);
   updateProfileMeta();
   updateProfileMeters();
-  
-  const companyMetaEl = document.getElementById('companyMeta');
-  if (companyMetaEl) {
-    companyMetaEl.textContent = `${industry} • ${tech}`;
-  }
-  setHeadlineLoadingVisible(true);
+  updateTraitFit();
   
   showScreen('game');
-  loadInitialScene();
 });
 
 document.querySelectorAll('.setup-tab').forEach(tab => {
@@ -194,11 +192,6 @@ document.querySelectorAll('.setup-tab').forEach(tab => {
 // Game screen logic
 const updateTextArea = document.getElementById('updateText');
 const charCountSpan = document.getElementById('charCount');
-const companyMetaEl = document.getElementById('companyMeta');
-if (companyMetaEl) {
-  companyMetaEl.textContent = '';
-}
-
 updateTextArea.addEventListener('input', () => {
   charCountSpan.textContent = updateTextArea.value.length;
 });
@@ -213,14 +206,12 @@ const roundTotalEl = document.getElementById('roundTotal');
 if (roundTotalEl) {
   roundTotalEl.textContent = TOTAL_PHASES;
 }
+const progressEndLabel = document.getElementById('progressEndLabel');
+if (progressEndLabel) {
+  progressEndLabel.textContent = `Month ${TOTAL_PHASES}`;
+}
 const phaseTitleEl = document.getElementById('phaseTitle');
 const phaseSubtitleEl = document.getElementById('phaseSubtitle');
-function setHeadlineLoadingVisible(visible) {
-  const headlineLoadingEl = document.getElementById('headlineLoadingNote');
-  if (headlineLoadingEl) {
-    headlineLoadingEl.style.display = visible ? 'block' : 'none';
-  }
-}
 if (phaseTitleEl) {
   phaseTitleEl.textContent = PHASE_TITLES[0].title;
 }
@@ -271,7 +262,7 @@ document.getElementById('submitRound').addEventListener('click', async () => {
     updateExplainability(result.nlp, result.analysisSource);
     updateAdvisorInsights(result.insights, result.insightsSource);
     updateRoundSummary(result);
-    updateNPCs(result.npcLines);
+    updateNPCs(result.deltas);
     updatePhaseTitle(result.phaseTitle);
   updateRoundDisplay(result.newState.round);
   updatePhaseTitle(PHASE_TITLES[Math.min(result.newState.round - 1, PHASE_TITLES.length - 1)]);
@@ -329,44 +320,6 @@ async function requestServerRound(text) {
   return result;
 }
 
-async function loadInitialScene() {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/intro-scene`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gameState })
-    });
-    if (!response.ok) {
-      throw new Error(`Intro scene failed (${response.status})`);
-    }
-    const data = await response.json();
-    applyIntroScene(data);
-  } catch (error) {
-    console.error('Failed to load intro scene:', error);
-  }
-}
-
-function applyIntroScene(data) {
-  if (!data) return;
-  updateRoundSummary({
-    sceneCard: data.sceneCard,
-    nlp: data.nlp || {},
-    milestoneEvents: [],
-    deltas: data.deltas || {},
-    insights: data.insights,
-    intentSummary: data.intentSummary
-  });
-  if (data.npcLines) {
-    updateNPCs(data.npcLines);
-  }
-  if (data.insights) {
-    updateAdvisorInsights(data.insights, data.insights.source);
-  }
-  if (data.nlp) {
-    updateExplainability(data.nlp, data.nlp.source);
-  }
-}
-
 function clampValue(num, min, max) {
   return Math.max(min, Math.min(max, num));
 }
@@ -386,12 +339,6 @@ function ensureServerResult(result) {
   }
   if (!result.insights || typeof result.insights !== 'object') {
     throw new Error('Server response missing advisor insights.');
-  }
-  if (!result.npcLines || typeof result.npcLines !== 'object') {
-    throw new Error('Server response missing NPC dialogue.');
-  }
-  if (typeof result.npcLines.vc !== 'string' || typeof result.npcLines.employee !== 'string') {
-    throw new Error('Server NPC dialogue response malformed.');
   }
 }
 
@@ -451,13 +398,68 @@ function updateMeters(meters) {
   updateProfileMeters();
 }
 
+function setMetricValue(elementId, value) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  el.classList.remove('metric-good', 'metric-warn', 'metric-bad');
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const rounded = Math.round(value);
+    el.textContent = rounded;
+    if (rounded >= 60) {
+      el.classList.add('metric-good');
+    } else if (rounded <= 39) {
+      el.classList.add('metric-bad');
+    } else {
+      el.classList.add('metric-warn');
+    }
+  } else {
+    el.textContent = '—';
+  }
+}
+
+function updateTraitFit(traitFit = {}) {
+  const grid = document.getElementById('traitFitGrid');
+  if (!grid) return;
+  const activeTraits = Array.isArray(gameState.traits) ? gameState.traits : [];
+  if (!activeTraits.length) {
+    grid.innerHTML = '<div class="trait-fit-empty">Pick two traits on the setup screen to see alignment scores.</div>';
+    return;
+  }
+  const hasScores = traitFit && typeof traitFit === 'object' && Object.keys(traitFit).length > 0;
+  grid.innerHTML = activeTraits
+    .map(trait => {
+      const score =
+        hasScores && typeof traitFit[trait] === 'number'
+          ? Math.round(traitFit[trait])
+          : '—';
+      return `<div class="trait-fit-pill active"><span>${trait}</span><strong>${score}</strong></div>`;
+    })
+    .join('');
+}
+
 function updateExplainability(nlp = {}, source) {
-  const sentiment = typeof nlp.sentiment === 'number' ? Math.round(nlp.sentiment) : '—';
-  const buzzword = typeof nlp.buzzword === 'number' ? Math.round(nlp.buzzword) : '—';
-  const feasibility = typeof nlp.feasibility === 'number' ? Math.round(nlp.feasibility) : '—';
-  document.getElementById('sentiment').textContent = sentiment;
-  document.getElementById('buzzword').textContent = buzzword;
-  document.getElementById('feasibility').textContent = feasibility;
+  const pickFirstNumber = (...candidates) => {
+    for (const value of candidates) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+    }
+    return undefined;
+  };
+  const productivityScore = pickFirstNumber(
+    nlp.productivityImpact,
+    nlp.feasibility,
+    nlp.sentiment
+  );
+  const moodScore = pickFirstNumber(nlp.moodSignal, nlp.sentiment);
+  const eventScore = pickFirstNumber(
+    nlp.eventRelevance,
+    typeof nlp.buzzword === 'number' ? 100 - nlp.buzzword : undefined
+  );
+  setMetricValue('productivityImpact', productivityScore);
+  setMetricValue('moodSignal', moodScore);
+  setMetricValue('eventRelevance', eventScore);
+  updateTraitFit(nlp.traitFit);
   const sourceLabel = document.getElementById('analysisSource');
   if (sourceLabel) {
     const labelMap = {
@@ -578,96 +580,83 @@ function determineReactionType(deltas = {}) {
   return positive ? 'success' : 'fail';
 }
 
-function displayStory(sceneCard, intentSummary, milestoneEvents) {
-  const storyEl = document.getElementById('story');
-  if (!storyEl) return;
-  const base = (sceneCard && (sceneCard.narrative || sceneCard.description)) || intentSummary || '';
-  const trimmed = base
-    .replace(/\s+/g, ' ')
-    .trim()
-    .split(/[\.\!?]/)
-    .filter(Boolean)
-    .slice(0, 1)
-    .map(line => line.trim())
-    .join('. ')
-    .slice(0, 160);
-  const milestoneLine = milestoneEvents && milestoneEvents.length ? ` ${milestoneEvents[0].summary || ''}` : '';
-  const text = `${trimmed}${milestoneLine}`.trim();
-  storyEl.textContent = text;
-  storyEl.classList.remove('visible');
-  void storyEl.offsetWidth;
-  if (text) {
-    storyEl.classList.add('visible');
-  }
-}
-
 function resetRoundSummary() {
-  setHeadlineLoadingVisible(true);
   const headlineEl = document.getElementById('summaryHeadline');
   const ctaEl = document.getElementById('summaryCTA');
-  const highlightEl = document.getElementById('summaryHighlight');
+  const bodyEl = document.getElementById('summaryBody');
   if (headlineEl) headlineEl.textContent = 'Feed the valley a story so they can panic properly.';
-  if (ctaEl) ctaEl.textContent = 'Keep hype and humans balanced before the board drafts a coup.';
-  if (highlightEl) {
-    highlightEl.textContent = '';
-    highlightEl.style.display = 'none';
+  if (bodyEl) {
+    bodyEl.textContent = 'Your first dispatch appears here once Gemini rewrites reality.';
+    bodyEl.classList.remove('good', 'bad');
   }
-  const storyEl = document.getElementById('story');
-  if (storyEl) {
-    storyEl.textContent = '';
-    storyEl.classList.remove('visible');
+  if (ctaEl) {
+    ctaEl.textContent = 'Keep hype and humans balanced before the board drafts a coup.';
   }
 }
 
 function updateRoundSummary(result) {
-  setHeadlineLoadingVisible(false);
   const headlineEl = document.getElementById('summaryHeadline');
   const ctaEl = document.getElementById('summaryCTA');
-  const highlightEl = document.getElementById('summaryHighlight');
-  if (!headlineEl || !ctaEl || !highlightEl) return;
+  const bodyEl = document.getElementById('summaryBody');
+  if (!headlineEl || !ctaEl || !bodyEl) return;
   const scene = result.sceneCard || result.nlp?.scenario || {};
   const milestoneEvent = Array.isArray(result.milestoneEvents) && result.milestoneEvents.length
     ? result.milestoneEvents[0]
     : null;
   const insightHeadline = result.insights?.headline || 'Markets are doomscrolling till you talk.';
   const insightCTA = result.insights?.tip || 'Ship specifics before the investors send “quick follow-up?”';
+  const narrativeText =
+    scene.narrative ||
+    scene.description ||
+    scene.body ||
+    scene.scenario?.description ||
+    milestoneEvent?.status ||
+    'Another valley saga unfolds.';
   headlineEl.textContent = scene.title || milestoneEvent?.title || insightHeadline;
-  ctaEl.textContent = scene.narrative || scene.body || milestoneEvent?.summary || insightCTA;
+  bodyEl.textContent = narrativeText;
+  bodyEl.classList.remove('good', 'bad');
+  ctaEl.textContent = scene.hook || scene.scenario?.hook || insightCTA;
   const deltas = result.deltas || {};
-  let highlightText = scene.hook || milestoneEvent?.hook || milestoneEvent?.highlight;
-  if (!highlightText) {
-    let strongest = null;
-    Object.entries(deltas).forEach(([key, value]) => {
-      if (typeof value !== 'number') return;
-      const magnitude = Math.abs(value);
-      if (!strongest || magnitude > strongest.magnitude) {
-        strongest = { key, value, magnitude };
-      }
-    });
-    const labelMap = {
-      ethics: 'Ethics',
-      burnout: 'Burnout',
-      funding: 'Funding'
-    };
-    if (strongest && strongest.magnitude >= 4) {
-      const emoji = strongest.value >= 0 ? '⬆️' : '⬇️';
-      const label = labelMap[strongest.key] || strongest.key;
-      highlightText = `${emoji} ${label} ${strongest.value > 0 ? '+' : ''}${Math.round(strongest.value)}`;
-    }
+  const tone = determineReactionType(deltas);
+  if (tone === 'success') {
+    bodyEl.classList.add('good');
+  } else if (tone === 'fail') {
+    bodyEl.classList.add('bad');
   }
-  if (highlightText) {
-    highlightEl.textContent = highlightText;
-    highlightEl.style.display = 'inline-block';
-  } else {
-    highlightEl.textContent = '';
-    highlightEl.style.display = 'none';
-  }
-  displayStory(scene, result.intentSummary, result.milestoneEvents || (milestoneEvent ? [milestoneEvent] : []));
 }
 
-function updateNPCs(npcLines) {
-  document.getElementById('vc-line').textContent = `"${npcLines.vc}"`;
-  document.getElementById('emp-line').textContent = `"${npcLines.employee}"`;
+function updateNPCs(deltas = {}) {
+  const vcEl = document.getElementById('vc-line');
+  const empEl = document.getElementById('emp-line');
+  if (!vcEl || !empEl) return;
+
+  const fundingDelta = typeof deltas.funding === 'number' ? deltas.funding : null;
+  let vcMessage = DEFAULT_VC_LINE;
+  if (fundingDelta !== null) {
+    if (fundingDelta >= 3) {
+      vcMessage = 'Deck looks tighter. Sending term sheet docs to legal.';
+    } else if (fundingDelta <= -3) {
+      vcMessage = 'Runway jitters here—show traction fast or the wire pauses.';
+    } else if (Math.abs(fundingDelta) > 0.25) {
+      vcMessage = 'Keeping tabs on the numbers. Keep the updates specific.';
+    }
+  }
+
+  const ethicsDelta = typeof deltas.ethics === 'number' ? deltas.ethics : null;
+  const burnoutDelta = typeof deltas.burnout === 'number' ? deltas.burnout : null;
+  let empMessage = DEFAULT_EMP_LINE;
+  if (ethicsDelta !== null || burnoutDelta !== null) {
+    if ((ethicsDelta !== null && ethicsDelta <= -3) || (burnoutDelta !== null && burnoutDelta >= 3)) {
+      empMessage = 'This feels grim. Folks are nervous about shortcuts and weekend emails.';
+    } else if ((ethicsDelta !== null && ethicsDelta >= 3) || (burnoutDelta !== null && burnoutDelta <= -3)) {
+      empMessage = 'Team actually breathed this week. Whatever you did, keep it humane.';
+    } else if (ethicsDelta !== null || burnoutDelta !== null) {
+      empMessage = 'Not panicking yet, but clarity helps. Keep us looped in.';
+    }
+  }
+
+  vcEl.textContent = vcMessage;
+  empEl.textContent = empMessage;
 }
 
 function updatePhaseTitle(stage) {
@@ -758,22 +747,16 @@ document.getElementById('restart').addEventListener('click', () => {
   updateMeters(gameState.meters);
   updateRoundDisplay(1);
   updatePhaseTitle(PHASE_TITLES[0]);
-  document.getElementById('sentiment').textContent = '—';
-  document.getElementById('buzzword').textContent = '—';
-  document.getElementById('feasibility').textContent = '—';
+  ['productivityImpact', 'moodSignal', 'eventRelevance'].forEach(id => setMetricValue(id));
   const sourceLabel = document.getElementById('analysisSource');
   if (sourceLabel) {
     sourceLabel.textContent = '—';
   }
+  updateTraitFit();
   updateAdvisorInsights(null, null);
   resetRoundSummary();
-  const companyMetaEl = document.getElementById('companyMeta');
-  if (companyMetaEl) {
-    companyMetaEl.textContent = '';
-  }
   resetProfileCard();
-  document.getElementById('vc-line').textContent = 'Still waiting for proof you can math, founder.';
-  document.getElementById('emp-line').textContent = 'Ping me when weekends are legal again.';
+  updateNPCs();
   
   showScreen('setup');
 });
