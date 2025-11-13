@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Founder Burnout Simulator</title>
+  <title>Burnout in Silly-con Valley</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
     <!-- Setup Screen -->
     <div id="setup" class="screen active">
       <div class="setup-container">
-        <h1 class="hero-title">⚡ Founder Burnout Simulator</h1>
+        <h1 class="hero-title">⚡ Burnout in Silly-con Valley</h1>
         <p class="goal-text">Outrun burnout across 10 frantic stages without selling out, crashing, or pivoting to Web3.</p>
 
         <div class="setup-tabs">
@@ -99,14 +99,14 @@
           <div class="instructions">
             <h2>📘 How to Play</h2>
             <ol>
-              <li>Complete the setup to define your doomed-but-hopeful startup.</li>
-              <li>Each stage, write a short update describing exactly what happened.</li>
-              <li>Gemini scores sentiment, buzzwords, and feasibility, then updates meters.</li>
-              <li>Keep Funding, Ethics, and Burnout in balance across 10 named stages.</li>
-              <li>NPC feedback, advisor tips, and headlines react to your progress.</li>
-              <li>Avoid burnout &gt; 80 or funding &lt; 0, and chase the ending you're after.</li>
+              <li>Name the doomed venture, pick an industry/tech stack, and lock in exactly two founder traits.</li>
+              <li>Hit “Begin the Grind.” Each month opens with a Silicon Valley Newspaper headline and Slack gossip telling you what chaos just landed.</li>
+              <li>Write a brutally specific 1–3 sentence update about what you did to respond. No vibes-only pitches.</li>
+              <li>Gemini scores productivity impact, mood signal, event relevance, and trait alignment—then swings Ethics, Funding, and Burnout with severity multipliers.</li>
+              <li>Watch the newspaper CTA, progress bar, NPC banter, and meters react instantly so you can pivot or double down.</li>
+              <li>Scrape through all 10 months without burnout hitting 80 or funding crashing to zero to unlock a less-roasted finale.</li>
             </ol>
-            <p class="instructions-note">Tip: Specific, metric-heavy updates tend to score better than vague hype.</p>
+            <p class="instructions-note">Tip: Concrete metrics and consequences make Gemini’s satire sharper (and the meters kinder).</p>
           </div>
         </div>
       </div>
@@ -119,19 +119,20 @@
         <h2 id="phaseTitle">Month 1: Garage Sparks</h2>
         <p id="phaseSubtitle" class="phase-subtitle">You promised friends and family traction before brunch.</p>
         <div class="month-counter">Month <span id="roundDisplay">1</span>/<span id="roundTotal">10</span></div>
-        <div class="company-meta" id="companyMeta"></div>
-        <div id="progress" class="progress-bar">
-          <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+        <div class="progress-wrapper">
+          <span class="progress-label start">Month 1</span>
+          <div id="progress" class="progress-bar">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <span class="progress-label end" id="progressEndLabel">Month 10</span>
         </div>
 
         <div class="interaction-stack">
-          <div class="headline-loading" id="headlineLoadingNote">Please wait a moment for your first headline to initialise.</div>
           <div id="roundSummary" class="panel summary-panel newspaper">
             <div class="newspaper-masthead">Silicon Valley Newspaper</div>
             <div class="summary-headline" id="summaryHeadline">Feed the valley a story so they can panic properly.</div>
-            <div class="summary-story" id="story"></div>
+            <div class="summary-body" id="summaryBody">Your first dispatch appears here once Gemini rewrites reality.</div>
             <div class="summary-cta" id="summaryCTA">Keep hype and humans balanced before the board drafts a coup.</div>
-            <div class="summary-highlight" id="summaryHighlight"></div>
           </div>
 
           <div id="npcs" class="panel npc-panel">
@@ -172,12 +173,19 @@ Example: “Promised 60% WoW growth if everyone canceled their weekend; ops thre
           <div id="explainability" class="panel">
             <h3>📊 Analysis</h3>
             <div class="analysis-grid">
-              <div>Sentiment: <strong id="sentiment">—</strong></div>
-              <div>Buzzwords: <strong id="buzzword">—</strong></div>
-              <div>Feasibility: <strong id="feasibility">—</strong></div>
+              <div>Productivity impact: <strong class="metric-value" id="productivityImpact">—</strong></div>
+              <div>Mood signal: <strong class="metric-value" id="moodSignal">—</strong></div>
+              <div>Event relevance: <strong class="metric-value" id="eventRelevance">—</strong></div>
+            </div>
+            <div class="trait-fit">
+              <div class="trait-fit-label">Trait alignment</div>
+              <div class="trait-fit-grid" id="traitFitGrid">
+                <div class="trait-fit-empty">Pick two traits on the setup screen to see alignment scores.</div>
+              </div>
             </div>
             <div class="analysis-source">Model: <strong id="analysisSource">—</strong></div>
           </div>
+          <h4 class="health-heading">Your Startup Health</h4>
           
           <div id="meters" class="stats-grid panel compact-stats">
             <div class="stat" id="stat-ethics">

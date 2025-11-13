@@ -35,7 +35,12 @@ function inferIntent(updateText = '', nlp = {}) {
 
 export function computeDeltas(nlp, updateText, gameState) {
   const { traits, company } = gameState;
-  const { sentiment = 50, buzzword = 50, feasibility = 55 } = nlp;
+  const {
+    productivityImpact = 50,
+    moodSignal = 50,
+    eventRelevance = 50,
+    traitFit = {}
+  } = nlp || {};
   const intent = inferIntent(updateText, nlp);
   const deltas = { burnout: 0, funding: 0, ethics: 0 };
 
@@ -74,9 +79,6 @@ export function computeDeltas(nlp, updateText, gameState) {
     }
   }
 
-  deltas.ethics -= (buzzword - 50) * 0.05;
-  deltas.funding += (feasibility - 50) * 0.09;
-  deltas.burnout += (65 - sentiment) * 0.05;
   if (/\btransparen|audit|report\b/i.test(updateText)) deltas.ethics += 5;
   if (/\bhire|hiring|team\b/i.test(updateText)) deltas.burnout -= 5;
 
@@ -100,10 +102,45 @@ export function computeDeltas(nlp, updateText, gameState) {
     deltas.funding += 4;
   }
 
+  const selectedTraitScores = Array.isArray(traits)
+    ? traits
+        .map(trait => (typeof traitFit[trait] === 'number' ? traitFit[trait] : 50))
+        .filter(score => typeof score === 'number')
+    : [];
+  const traitAvg = selectedTraitScores.length
+    ? selectedTraitScores.reduce((sum, score) => sum + score, 0) / selectedTraitScores.length
+    : 50;
+
+  const eventAvg = (productivityImpact + moodSignal + eventRelevance) / 3;
+  let eventMultiplier = 1;
+  if (eventAvg >= 65) {
+    eventMultiplier = 0.9;
+  } else if (eventAvg <= 35) {
+    eventMultiplier = 1.2;
+  }
+
+  function applyTraitModifier(value) {
+    if (typeof value !== 'number') return value;
+    if (!selectedTraitScores.length) return value;
+    if (traitAvg >= 70) {
+      return value >= 0 ? value * 1.1 : value * 0.8;
+    }
+    if (traitAvg <= 30) {
+      return value >= 0 ? value * 0.9 : value * 1.3;
+    }
+    return value;
+  }
+
+  DEFAULT_METERS.forEach(key => {
+    if (typeof deltas[key] === 'number') {
+      deltas[key] = applyTraitModifier(deltas[key]) * eventMultiplier;
+    }
+  });
+
   const severity = Math.max(
-    Math.abs(sentiment - 50),
-    Math.abs(feasibility - 50),
-    Math.abs(buzzword - 50) * 0.8
+    Math.abs(productivityImpact - 50),
+    Math.abs(moodSignal - 50),
+    Math.abs(eventRelevance - 50)
   );
   let multiplier = 1;
   if (severity >= 35) {

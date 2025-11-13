@@ -4,6 +4,7 @@ import { TOTAL_PHASES, getPhaseTitle } from './gameLogic.js';
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const DEFAULT_SERVER_KEY = 'AIzaSyB7EUog3GLcaTmEDMJpfXgiX9ZKswO8wiE';
 const clientCache = new Map();
+const FOUNDER_TRAITS = ['Ambition', 'Integrity', 'Charisma', 'Resilience'];
 
 function formatHistoryContext(history = []) {
   if (!Array.isArray(history) || !history.length) {
@@ -38,6 +39,18 @@ function buildCompanyContext(gameState = {}) {
     : 'No traits selected';
   const founderLine = founderName ? `Founder: ${founderName}` : 'Founder: (not provided)';
   return `${name}\n${founderLine}\nIndustry: ${industry}\nTech focus: ${tech}\nFounder traits: ${traits}`;
+}
+
+function latestHeadlineContext(gameState = {}) {
+  const log = gameState?.narrative?.sceneLog;
+  if (Array.isArray(log) && log.length) {
+    const latest = log[log.length - 1] || {};
+    const title = latest.title || latest.scenario?.title || 'Unnamed headline';
+    const summary = latest.narrative || latest.description || latest.body || latest.scenario?.description || 'No summary captured.';
+    const hook = latest.hook || latest.scenario?.hook || 'No hook provided.';
+    return `Latest newspaper headline: "${title}". Summary: ${summary}. Current hook/call-to-action: ${hook}`;
+  }
+  return 'No previous headline yet—this is the first prompt.';
 }
 
 function resolveApiKey(explicitKey) {
@@ -273,11 +286,17 @@ export async function analyzeUpdate(text, gameState, apiKey) {
   const client = await getClient(apiKey);
   const companyContext = buildCompanyContext(gameState);
   const historyContext = formatHistoryContext(gameState.history);
+  const headlineContext = latestHeadlineContext(gameState);
+  const selectedTraits = Array.isArray(gameState.traits) && gameState.traits.length
+    ? gameState.traits.join(', ')
+    : 'None selected (default to Ambition & Integrity)';
   const contextPrompt = `Company context:
 ${companyContext}
 
 Round: ${gameState.round}/${TOTAL_PHASES}
 Current meters: Ethics ${gameState.meters.ethics}, Burnout ${gameState.meters.burnout}, Funding ${gameState.meters.funding}
+${headlineContext}
+Traits to evaluate: ${selectedTraits}
 
 Founder update:
 "${text}"
@@ -288,12 +307,13 @@ ${historyContext}`;
   try {
     const parsed = await requestJSONResponse(
       client,
-      `You interpret founder updates for a burnout management sim. Always ground every field in the provided founder update, company context, and history summary (quote concrete metrics or actions where possible). Keep the satire understandable to anyone who has heard of Silicon Valley hustle culture—no deep insider jargon.
+      `You interpret founder updates for a burnout management sim. Always ground every field in the provided founder update, company context, founder traits, latest newspaper hook, and history summary (quote concrete metrics or actions where possible). Keep the satire understandable to anyone who has heard of Silicon Valley hustle culture—no deep insider jargon.
 Return strict JSON with:
-- "sentiment" (0-100)
-- "buzzword" (0-100)
-- "feasibility" (0-100)
+- "productivityImpact" (0-100) → how concrete/actionable the described work is.
+- "moodSignal" (0-100) → emotional tone the update broadcasts to stakeholders.
+- "eventRelevance" (0-100) → how directly it addresses the current Silicon Valley Newspaper hook.
 - "intent" (snake_case like "funding", "rest", "ethics", "crisis", "build")
+- "traitFit": object keyed ONLY by the listed founder traits (usually two). Each value is 0-100 showing how well the update embodied that trait. If there is zero evidence, score between 10-20 instead of inventing alignment.
 - "meterDeltas": integers (-15..15) for "burnout", "funding", "ethics" that reflect how the text would change those meters (positive burnout = more exhaustion).
 - "scenario": {"title": "headline tied to the update", "description": "2 tight sentences referencing exact details", "hook": "call-to-action"}
 
@@ -303,11 +323,23 @@ Ground EVERYTHING in the provided text/context. No generic archetypes. Output ON
     if (!parsed || typeof parsed !== 'object') {
       throw new Error('Gemini returned an invalid analysis payload.');
     }
-    ['sentiment', 'buzzword', 'feasibility'].forEach(key => {
+    ['productivityImpact', 'moodSignal', 'eventRelevance'].forEach(key => {
       if (typeof parsed[key] !== 'number') {
         throw new Error(`Gemini analysis missing numeric field "${key}".`);
       }
     });
+    const playerTraits =
+      (Array.isArray(gameState.traits) && gameState.traits.length && gameState.traits) ||
+      FOUNDER_TRAITS.slice(0, 2);
+    if (!parsed.traitFit || typeof parsed.traitFit !== 'object') {
+      throw new Error('Gemini analysis missing traitFit map.');
+    }
+    const normalizedTraitFit = {};
+    playerTraits.forEach(trait => {
+      const raw = parsed.traitFit?.[trait];
+      normalizedTraitFit[trait] = typeof raw === 'number' ? raw : 0;
+    });
+    parsed.traitFit = normalizedTraitFit;
     if (typeof parsed.intent !== 'string' || !parsed.intent) {
       throw new Error('Gemini analysis missing intent.');
     }
