@@ -46,7 +46,7 @@ body {
 
 /* Setup Screen */
 .setup-container {
-  max-width: 640px;
+  max-width: 1000px;
   margin: 60px auto;
   background: var(--surface);
   padding: 44px;
